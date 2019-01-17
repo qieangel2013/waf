@@ -12,9 +12,9 @@ ip_check_timespan_s = 86400    	      --检查步长
 access_threshold_count = 20000 		  --访问频率计数阈值
 --redsipool.lua redis连接池配置
 redis_config = {
-	host = "123.57.229.36",
+	host = "127.0.0.1",
   	port = 6379,
-  	password = "kanjia888888"
+  	password = "111111"
 }
 --输出重定向
 redirect_url = "https://www.julive.com"
