@@ -4,7 +4,7 @@ local _M = {}
 --获取redis连接
 function _M.new(self)
     local red = redis:new()
-    red:set_timeout(1000) -- one second timeout
+    red:set_timeout(20) -- one second timeout
     local res = red:connect(redis_config['host'], redis_config['port'])
     if not res then
         return nil

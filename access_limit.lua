@@ -1,21 +1,23 @@
 --waf.lua拦截cc攻击 cc攻击频率 (需要nginx.conf的http段增加lua_shared_dict limit 10m;)
-cc_rate = "1000/60" --设置cc攻击频率，单位为秒. 默认1分钟同一个IP只能请求同一个地址10次
+cc_rate = "10/60" --设置cc攻击频率，单位为秒. 默认1分钟同一个IP只能请求同一个地址10次
 --useragent 配置useragent规则
-useragent ={"(HTTrack|harvest|audit|dirbuster|pangolin|nmap|sqln|-scan|hydra|Parser|libwww|BBBike|sqlmap|w3af|owasp|Nikto|fimap|havij|PycURL|zmeu|BabyKrokodil|netsparker|httperf|bench| SF/)"}
+useragent ={"(Wget|AgentBench|HTTrack|harvest|audit|dirbuster|pangolin|nmap|sqln|-scan|hydra|Parser|libwww|BBBike|sqlmap|w3af|owasp|Nikto|fimap|havij|PycURL|zmeu|BabyKrokodil|netsparker|httperf|bench| SF/)"}
 --白名单IP
 ipWhiteTable = {"11.25.17.18"}
 --黑名单IP
-ipBlackTable = {"192.168.234.1","192.168.234.2-192.168.234.5"}
+ipBlackTable = {"192.168.234.8","192.168.234.1-192.168.234.5"}
 --ip_limit.lua ip限制
 ttl_timespan_s = {86400,5*86400,0}    --封禁时长
 ip_check_timespan_s = 86400    	      --检查步长
-access_threshold_count = 20000 		  --访问频率计数阈值
+access_threshold_count = 200 		  --访问频率计数阈值
 --redsipool.lua redis连接池配置
 redis_config = {
 	host = "127.0.0.1",
   	port = 6379,
   	password = "111111"
 }
+--日志
+logpath = "/usr/local/nginx/logs"
 --输出重定向
 redirect_url = "https://www.julive.com"
 --返回状态码
@@ -43,12 +45,12 @@ li{ list-style-type:none;}
   <div style="width:600px; float:left;">
     <div style=" height:40px; line-height:40px; color:#fff; font-size:16px; overflow:hidden; background:#6bb3f6; padding-left:20px;">网站防火墙 </div>
     <div style="border:1px dashed #cdcece; border-top:none; font-size:14px; background:#fff; color:#555; line-height:24px; height:220px; padding:20px 20px 0 20px; overflow-y:auto;background:#f3f7f9;">
-      <p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-weight:600; color:#fc4f03;">您的请求带有不合法参数，已被网站管理员设置拦截！</span></p>
+      <p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-weight:600; color:#fc4f03;">您的请求带有不合法的规范，已被网站防火墙拦截！</span></p>
 <p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">可能原因：您提交的内容包含危险的攻击请求</p>
 <p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:1; text-indent:0px;">如何解决：</p>
 <ul style="margin-top: 0px; margin-bottom: 0px; margin-left: 0px; margin-right: 0px; -qt-list-indent: 1;"><li style=" margin-top:12px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">1）检查提交内容；</li>
-<li style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">2）如网站托管，请联系空间提供商；</li>
-<li style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">3）普通网站访客，请联系网站管理员；</li></ul>
+<li style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">2）联系官方客服；</li>
+<li style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">3）电话：400；</li></ul>
     </div>
   </div>
 </div>
@@ -68,32 +70,34 @@ local ipLimit = require "ip_limit"
 local iplimit = ipLimit:new()
 
 --输出格式化
-function output_print(data)
+function output_print(data,msg)
 	if error_output == 'on' then
 		ngx.header.content_type = "text/html"
         ngx.status = ngx.HTTP_FORBIDDEN
         ngx.say(error_output_html)
+        utils.log(msg[1],ngx.var.request_uri,msg[2],msg[3])
         ngx.exit(ngx.status)
 	else
+		utils.log(msg[1],ngx.var.request_uri,msg[2],msg[3])
 		ngx.exit(data)
 	end
 end
 
 
 --waf过滤 黑名单过滤
-local blacktatus = waf.black_ip_check()
+local blacktatus,blackip,blackrule = waf.black_ip_check()
 if blacktatus and blacktatus ~= 1 then
-	output_print(blacktatus)
+	output_print(blacktatus,{"black_ip_check",blackip,blackrule})
 end
 --waf过滤 cc攻击
-local wafstatus = waf.cc_attack_check()
+local wafstatus,wafreq,wafCCcount = waf.cc_attack_check()
 if wafstatus and wafstatus ~= 1 then
-	output_print(wafstatus)
+	output_print(wafstatus,{"cc_attack_check",wafreq,wafCCcount})
 end
 --waf过滤 useragent过滤
-local wafastatus = waf.user_agent_attack_check()
+local wafastatus,wafuseragent,wafagentrule = waf.user_agent_attack_check()
 if wafastatus and wafastatus ~= 1 then
-	output_print(wafastatus)
+	output_print(wafastatus,{"user_agent_attack_check",wafuseragent,wafagentrule})
 end
 --单IP单uid固定接口 组合限制
 --当某一uid被限流时尽量不影响该IP内的其他用户
@@ -102,7 +106,7 @@ end
 -- 	ngx.exit(ok1)
 -- end
 --单IP全局限流检查
-local ok = iplimit.check_ip_freq()
+local ok,ipkey,iprule = iplimit.check_ip_freq()
 if ok and ok ~= 1 then
-	output_print(ok)
+	output_print(ok,{"iplimit.check_ip_freq",ipkey,iprule})
 end

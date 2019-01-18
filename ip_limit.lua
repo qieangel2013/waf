@@ -30,9 +30,9 @@ function _M.check_ip_freq(self)
 		ipstep = 1
 	end
 	if tonumber(is_deny) == 1 then
-		ngx.log(ngx.ERR,"globalipfreq_deny ","ip: "..rds_key.." : deny timespan : "..ttl_timespan_s[tonumber(ipstep)])
+		--ngx.log(ngx.ERR,"globalipfreq_deny ","ip: "..rds_key.." : deny timespan : "..ttl_timespan_s[tonumber(ipstep)])
 		rds:close()
-		return error_status
+		return error_status,rds_key,"当前ip已经被限制，globalipfreq_deny ip: "..rds_key.." : deny timespan（限制时长，以秒为单位） : "..ttl_timespan_s[tonumber(ipstep)]
 	end
 
 	local start_time , err = rds:get(key_prefix_stime..rds_key)
@@ -58,9 +58,9 @@ function _M.check_ip_freq(self)
 					res , err = rds:set(key_prefix_isdeny..rds_key,1)
 					res , err = rds:incr(key_prefix_step..rds_key)
 					res , err = rds:expire(key_prefix_isdeny..rds_key,ttl_timespan_s[tonumber(ipstep)])
-					ngx.log(ngx.ERR,"globalipfreq_deny ","ip: "..rds_key.." : deny timespan : "..ttl_timespan_s[tonumber(ipstep)])
+					-- ngx.log(ngx.ERR,"globalipfreq_deny ","ip: "..rds_key.." : deny timespan : "..ttl_timespan_s[tonumber(ipstep)])
 					rds:close()
-					return error_status
+					return error_status,rds_key,"当前ip已经被限制,globalipfreq_deny ,ip: "..rds_key.." : deny timespan (限制时长，以秒为单位): "..ttl_timespan_s[tonumber(ipstep)]..",限制次数触发了，对当前次数"..count.."，设置的最大访问次数："..access_threshold_count
 				end
 			else
 				res , err = rds:set(key_prefix_isdeny..rds_key,1)
